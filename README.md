@@ -1,18 +1,18 @@
 # Devy Programming Language
 
-Devy is an experimental programming language toolkit that currently focuses on token-level helpers and basic tokenization logic. The repository packages the primitives needed to build higher-level parsing, error handling, and editor tooling on top of `.devy` source files.
+Devy is an experimental programming-language toolkit that focuses on token-level helpers, basic tokenization, and a small set of runtime utilities. The current codebase is intentionally compact so that contributors can inspect every moving part and extend it with their own ideas for syntax or tooling.
 
-> **Preview notice:** Devy is currently in preview so that early adopters can exercise the language, share feedback, and help shape its evolution. Because the toolkit is open source, the community is encouraged to fork it, build fresh Devy flavors, and publish their own distributions that extend the core helpers described below.
+> **Preview notice:** Devy is in public preview so that early adopters can exercise the language, share feedback, and help shape its evolution. Because the toolkit is open source, the community is encouraged to fork it, craft new Devy flavors, and publish custom distributions that extend the helpers documented below.
 
 ## Repository layout
 
-- `lang.js` exposes reusable helper predicates for common lexical categories (letters, whitespace, numbers, parentheses, quotes, and operators) and exports additional metadata used by other tools in the stack.【F:lang.js†L5-L31】【F:lang.js†L45-L51】
-- `tokenize.js` defines a minimal tokenizer that walks over an input string, producing tokens for parentheses and a placeholder `CursorType`, and throws on unsupported characters.【F:tokenize.js†L3-L35】
-- `fileext.js` registers the `.devy` file extension with a custom MIME type and demonstrates how language assets can be retrieved dynamically in browser-based tooling.【F:fileext.js†L1-L3】
+- `lang.js` exports the default `helpers` object with predicates for letters, whitespace, numbers, parentheses, quotes, and arithmetic operators. It also bundles the regular-expression metadata and factory utilities used by higher-level tooling.【F:lang.js†L5-L52】
+- `tokenize.js` defines a minimal tokenizer that iterates through an input string and produces tokens for parentheses while reserving a future `CursorType` classification.【F:tokenize.js†L3-L33】
+- `fileext.js` registers `.devy` as a recognized extension and illustrates how consumer tooling can fetch the language helpers and tokenizer modules on demand.【F:fileext.js†L1-L3】
 
 ## Lexical helpers
 
-`lang.js` centralizes the regular expressions and derived helper functions that describe Devy's core character classes. These include checks for function markers (`/add/`), function-name markers (`/name/`), tab-visibility checks (`/istabactive/`), alphabetic characters, whitespace, numeric strings, parentheses, quotes, and arithmetic operators.【F:lang.js†L5-L31】 By consolidating the helpers in one module, other tooling can share consistent semantics when interpreting source text.
+`lang.js` centralizes the regular expressions that describe Devy’s core character classes. Besides the `helpers` predicates, the module exposes `functionhelpers.combined` for matching `/add/` and `/name/` markers together and a `checktab` pattern that checks tab-visibility hints within `.devy` scripts.【F:lang.js†L5-L31】【F:lang.js†L45-L51】 These exports are designed to be shared across future parsers, editor integrations, or analysis tools.
 
 ### Example: using lexical helpers
 
@@ -23,22 +23,22 @@ Devy is an experimental programming language toolkit that currently focuses on t
 "istabactive"
 ```
 
-The first two lines exercise the `/add/` and `/name/` markers that `functionhelpers.combined` can detect, while the parenthesized arithmetic and quoted string hit the shared predicates for parentheses, operators, numbers, and quotes. The trailing `"istabactive"` literal matches the exported tab-visibility regular expression, providing a quick tour through the bundled lexical helpers.【F:lang.js†L5-L31】【F:lang.js†L45-L51】
+The first two lines exercise the `/add/` and `/name/` markers that `functionhelpers.combined` can detect, while the parenthesized arithmetic and quoted string rely on the shared predicates for parentheses, operators, numbers, and quotes.【F:lang.js†L5-L31】【F:lang.js†L45-L51】 The literal `"istabactive"` demonstrates how downstream tooling can reuse the tab-visibility regular expression without redefining it.
 
-### Example: building derived helpers
+### Example: composing derived helpers
 
 ```devy
 (+)
 (+ )
 ```
 
-The first form supplies the minimal three-character sequence that a derived predicate could validate using the parenthesis and operator helpers, whereas the second form adds a trailing space that the same helper would reject, illustrating how exported primitives can be composed into higher-level recognizers without duplicating regular expressions.
+The first form supplies the minimal three-character sequence that a derived predicate could validate using the parenthesis and operator helpers. The second form includes a trailing space, highlighting how the exported primitives can be combined to build stricter recognizers without duplicating regular expressions.
 
 ## Error handling primitives
 
-The `error` factory in `lang.js` builds a structured error descriptor with a human-readable message and a helper that produces a rejected promise. This is exposed through the `ERRORHANDLE` instance and the `CUSTOMERRORHANDLER` shortcut, offering a consistent way to surface asynchronous errors tied to particular function tokens.【F:lang.js†L35-L55】
+The `error` factory in `lang.js` produces a structured descriptor with a human-readable message and a helper that yields a rejected promise. This pattern is bundled into the `ERRORHANDLE` singleton and its `CUSTOMERRORHANDLER` shortcut so that asynchronous failures stay consistent across utilities that depend on the same function markers.【F:lang.js†L33-L55】
 
-When building additional tooling, prefer to reuse this factory so that new features integrate cleanly with existing error-reporting semantics.
+When extending Devy, prefer to reuse this factory instead of inventing new error-surfacing conventions. Doing so ensures new helpers integrate cleanly with the established semantics.
 
 ### Example: raising a custom error
 
@@ -49,6 +49,16 @@ When building additional tooling, prefer to reuse this factory so that new featu
 ( load legacy-tool )
 ```
 
+The second `load` expression intentionally violates a hypothetical rule that all features must be prefixed with `devy:`. Downstream tooling could call `CUSTOMERRORHANDLER()` to throw a consistent "Error in /name/" message while preserving context about the function token that triggered the failure.【F:lang.js†L33-L55】
+
+## Tokenization workflow
+
+The tokenizer focuses on a deliberately small grammar:
+
+1. **Parenthesis** tokens for `(` and `)` characters, driven by the shared `helpers.isParenthesis` predicate.【F:tokenize.js†L10-L18】
+2. A placeholder **CursorType** branch that reserves space for cursor-aware constructs. The supporting predicate is not yet implemented, so the branch effectively documents upcoming work.【F:tokenize.js†L20-L27】
+
+Any other character causes the tokenizer to throw an error, making the current lexical scope explicit and easy to modify.【F:tokenize.js†L29-L33】 Extending Devy involves expanding `lang.js` with new predicates (for identifiers, numbers, or comments) and teaching `tokenize.js` how to emit the corresponding tokens.
 The second `load` expression deliberately omits the `devy:` prefix that surrounding infrastructure expects; when encountered at runtime, the shared `CUSTOMERRORHANDLER` helper would surface a consistent "Unsupported feature" message while preserving context about the failing token.【F:lang.js†L35-L55】
 
 ## Tokenization workflow
@@ -66,6 +76,11 @@ Any other character causes the tokenizer to throw an error, making it clear that
 (())
 ```
 
+Feeding this fragment into `tokenize` yields four `Parenthesis` tokens, demonstrating the tokenizer’s emphasis on balanced delimiters. Introducing any unsupported character will raise an error until the helper set and tokenizer are expanded to cover it.
+
+> **Note:** `helpers.isCursorType` is referenced by the tokenizer but not yet exported from `lang.js`, so cursor tokens currently fall back to the error path. This is one of the first areas the preview community is invited to tackle.【F:tokenize.js†L20-L27】【F:lang.js†L23-L31】
+
+### Example: planning a tokenizer extension
 Feeding this fragment into `tokenize` yields four `Parenthesis` tokens, demonstrating the tokenizer's current focus on balanced delimiters. Any additional character outside that narrow grammar would be rejected until corresponding helpers and tokenizer branches are introduced.
 
 > **Note:** `helpers.isCursorType` is referenced by the tokenizer but is not yet implemented in `lang.js`, so cursor-aware tokens will currently throw an error.【F:tokenize.js†L20-L27】【F:lang.js†L23-L32】
@@ -76,11 +91,11 @@ Feeding this fragment into `tokenize` yields four `Parenthesis` tokens, demonstr
 (1+)
 ```
 
-Once numeric and operator branches are added to the tokenizer, a snippet like `(1+)` can expand into a richer token stream that blends parentheses, number literals, and arithmetic operators without redefining the underlying character-class helpers.【F:lang.js†L13-L21】 This highlights the incremental path for broadening Devy's grammar.
+Once numeric and operator branches are implemented, a snippet like `(1+)` can expand into a token stream that mixes parentheses, number literals, and arithmetic operators without redefining the underlying character-class helpers.【F:lang.js†L13-L21】 This illustrates the incremental path toward richer grammar support.
 
 ## File extension integration
 
-`fileext.js` demonstrates how `.devy` files can be registered and how supporting assets such as `lang.js` and `tokenize.js` can be loaded asynchronously. Tooling that runs in a browser can adopt the same pattern to ensure language services are fetched alongside source files.【F:fileext.js†L1-L3】 This pattern keeps the core language modules decoupled and ready for reuse across editors, playgrounds, or build pipelines.
+`fileext.js` registers `.devy` with a custom MIME type and demonstrates how to fetch `lang.js` and `tokenize.js` dynamically. Browser-based tooling can mirror this approach to ensure language services load alongside source files without bundling the helpers directly.【F:fileext.js†L1-L3】
 
 ### Example: dynamically loading language assets
 
@@ -90,12 +105,12 @@ Once numeric and operator branches are added to the tokenizer, a snippet like `(
 ( () )
 ```
 
-A `.devy` bootstrap script like the above can be associated with the registered MIME type, ensuring that editor extensions or playgrounds load the language helpers and tokenizer alongside the source before evaluating the empty invocation form.
+A `.devy` bootstrap script like the above can be associated with the registered MIME type so that editor extensions or playgrounds fetch the language helpers and tokenizer before evaluating the empty invocation form. This keeps Devy distributions modular and ready for experimentation.
 
 ## Roadmap and customization notes
 
-- The helpers currently do not expose an `isCursorType` predicate even though the tokenizer expects one, highlighting an area that needs implementation before cursor tokens can be recognized properly.【F:tokenize.js†L20-L27】【F:lang.js†L23-L32】
-- Additional helpers (for identifiers, literals, comments, etc.) and corresponding tokenizer branches are expected as the language matures.
-- Downstream tools may leverage the imported `useDeferredValue` and `visibilityjs` utilities in `lang.js` to respond to UI state, although these are not yet wired into the exported helpers.【F:lang.js†L1-L2】
+- Implement `helpers.isCursorType` so the tokenizer’s reserved branch can emit cursor tokens without throwing.【F:tokenize.js†L20-L27】【F:lang.js†L23-L31】
+- Introduce helpers for identifiers, literals, and comments, and extend `tokenize.js` to recognize the new tokens as the grammar matures.【F:lang.js†L9-L29】【F:tokenize.js†L3-L33】
+- Investigate wiring the imported `useDeferredValue` React helper and `visibilityjs` utility into higher-level tooling, since they are currently unused but hint at UI integrations Devy may grow into.【F:lang.js†L1-L2】
 
-Contributions that expand the helper set, tighten the tokenizer, or document higher-level language constructs are welcome and should build upon the shared primitives established in this repository.
+Contributions that expand the helper set, tighten the tokenizer, or document higher-level language constructs are welcome. Fork the repository, prototype new Devy flavors, and share the distributions back with the community while the language remains in preview.
