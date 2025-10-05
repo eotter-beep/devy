@@ -59,6 +59,16 @@ The tokenizer focuses on a deliberately small grammar:
 2. A placeholder **CursorType** branch that reserves space for cursor-aware constructs. The supporting predicate is not yet implemented, so the branch effectively documents upcoming work.【F:tokenize.js†L20-L27】
 
 Any other character causes the tokenizer to throw an error, making the current lexical scope explicit and easy to modify.【F:tokenize.js†L29-L33】 Extending Devy involves expanding `lang.js` with new predicates (for identifiers, numbers, or comments) and teaching `tokenize.js` how to emit the corresponding tokens.
+The second `load` expression deliberately omits the `devy:` prefix that surrounding infrastructure expects; when encountered at runtime, the shared `CUSTOMERRORHANDLER` helper would surface a consistent "Unsupported feature" message while preserving context about the failing token.【F:lang.js†L35-L55】
+
+## Tokenization workflow
+
+The tokenizer currently recognizes two token types:
+
+1. **Parenthesis** tokens for `(` and `)` characters, identified using the shared helper module.【F:tokenize.js†L10-L18】
+2. **CursorType** tokens, a placeholder hook for future cursor-aware constructs in editors or runtimes.【F:tokenize.js†L20-L27】
+
+Any other character causes the tokenizer to throw an error, making it clear that the lexical grammar is intentionally narrow at this stage.【F:tokenize.js†L30-L34】 Extending Devy involves augmenting `helpers` with new predicates (for example, to support identifiers or literals) and updating `tokenize.js` with matching cases.
 
 ### Example: tokenizing a string
 
@@ -71,6 +81,11 @@ Feeding this fragment into `tokenize` yields four `Parenthesis` tokens, demonstr
 > **Note:** `helpers.isCursorType` is referenced by the tokenizer but not yet exported from `lang.js`, so cursor tokens currently fall back to the error path. This is one of the first areas the preview community is invited to tackle.【F:tokenize.js†L20-L27】【F:lang.js†L23-L31】
 
 ### Example: planning a tokenizer extension
+Feeding this fragment into `tokenize` yields four `Parenthesis` tokens, demonstrating the tokenizer's current focus on balanced delimiters. Any additional character outside that narrow grammar would be rejected until corresponding helpers and tokenizer branches are introduced.
+
+> **Note:** `helpers.isCursorType` is referenced by the tokenizer but is not yet implemented in `lang.js`, so cursor-aware tokens will currently throw an error.【F:tokenize.js†L20-L27】【F:lang.js†L23-L32】
+
+### Example: extending the tokenizer
 
 ```devy
 (1+)
