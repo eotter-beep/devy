@@ -2,9 +2,9 @@ import { useDeferredValue } from "https://cdn.jsdelivr.net/npm/react@19.2.0/+esm
 import visibility from "https://cdn.jsdelivr.net/npm/visibilityjs@2.0.2/+esm"
 
 // Define regex-based identifiers
-const FUNCTION = /add/
 const FUNCNAME = /name/
-const CHECKTAB = /istabactive/
+const FUNCTION = () => newpromise(FUNCNAME)
+const CHECKTAB = () => !Visibility.every(1000)
 const LETTER = /[a-zA-Z]/
 const WHITESPACE = /\s+/
 const NUMBER = /^[0-9]+$/
